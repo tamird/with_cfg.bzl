@@ -1,0 +1,47 @@
+name: Check conditional list assignments
+on:
+  push:
+    branches: [qualification/conditional-list-setting]
+permissions: {}
+jobs:
+  supplier:
+    if: github.repository == 'tamird/with_cfg.bzl' && github.actor == github.repository_owner && github.event.created && !github.event.deleted && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Verify the public source and the two native Bazel releases
+        run: |
+          set -euo pipefail
+          w="$RUNNER_TEMP/conditional-list"
+          mkdir -p "$w"/{src,out}
+          cd "$w/src"
+          git init -q
+          git -c gc.auto=0 fetch -q --depth=3 https://github.com/tamird/with_cfg.bzl.git "$GITHUB_SHA"
+          product=8cd26b34acdb2da2a1b56331c267d8dcc0f29622
+          test "$(git rev-parse "$GITHUB_SHA^")" = "$product"
+          test "$(git rev-parse "$product^")" = 9b8b10962419346889e528cbe57a539754489d57
+          test "$(git rev-parse "$product^{tree}")" = 9697fd8b2cbd75e9aa1df088441bc6b4f5b06d59
+          git diff --exit-code "$product" "$GITHUB_SHA" -- . ':!.github/workflows/conditional-list.yml' ':!.github/qualification/conditional_list.py'
+          git show "$GITHUB_SHA:.github/qualification/conditional_list.py" > "$w/check.py"
+          git checkout -q --detach "$product"
+          test "$(cat .bazelversion)" = 9.2.0
+          cd "$w"
+          for v in 9.2.0 7.7.1; do
+            curl --proto '=https' --proto-redir '=https' -fsSL --retry 2 "https://releases.bazel.build/$v/release/bazel-$v-linux-x86_64" -o "bazel-$v"
+          done
+          sha256sum -c <<'SUMS'
+          115a1b62be95f29e5821d4dddffba1b058905a48019b499919c285e7f708d5e2  bazel-7.7.1
+          7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694  bazel-9.2.0
+          SUMS
+          chmod 755 bazel-7.7.1 bazel-9.2.0
+      - name: Test the transition, existing suite, generated documentation and formatting
+        run: |
+          w="$RUNNER_TEMP/conditional-list"
+          env -i HOME="$HOME" USER="$USER" PATH="$PATH" LANG=C.UTF-8 RUNNER_TEMP="$RUNNER_TEMP" python3 -IB "$w/check.py"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always() && !cancelled()
+        with:
+          name: supplier-list-settings
+          path: ${{ runner.temp }}/conditional-list/out/supplier.json
+          if-no-files-found: error
+          retention-days: 14
