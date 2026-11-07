@@ -265,6 +265,40 @@ def _is_test_test_impl(env):
     env.expect.where(rule = "sh_library").that_bool(is_test(env.ctx.attr.sh_library)).equals(False)
     env.expect.where(rule = "sh_test").that_bool(is_test(env.ctx.attr.sh_test)).equals(True)
 
+_ListFlagsInfo = provider(fields = ["copts", "conlyopts", "cxxopts"])
+
+def _list_flags_impl(ctx):
+    cpp = ctx.fragments.cpp
+    return [_ListFlagsInfo(copts = cpp.copts, conlyopts = cpp.conlyopts, cxxopts = cpp.cxxopts)]
+
+_list_flags = rule(implementation = _list_flags_impl, fragments = ["cpp"])
+
+_list_builder = with_cfg(_list_flags, extra_providers = [_ListFlagsInfo])
+_list_builder.set("copt", select({"//conditions:default": []}), keep_if_empty = True)
+_list_builder.set("conlyopt", [])
+_list_builder.set("cxxopt", ["replacement"], keep_if_empty = True)
+_transitioned_list_flags, _list_flags_alias = _list_builder.build()
+
+def _set_empty_list_test(name):
+    subject = name + "_subject"
+    _transitioned_list_flags(name = subject)
+    analysis_test(
+        name = name,
+        target = subject,
+        impl = _set_empty_list_test_impl,
+        config_settings = {
+            "//command_line_option:conlyopt": ["incoming"],
+            "//command_line_option:copt": ["incoming"],
+            "//command_line_option:cxxopt": ["incoming"],
+        },
+    )
+
+def _set_empty_list_test_impl(env, target):
+    flags = target[_ListFlagsInfo]
+    env.expect.that_collection(flags.copts).contains_exactly(["incoming"])
+    env.expect.that_collection(flags.conlyopts).contains_exactly([])
+    env.expect.that_collection(flags.cxxopts).contains_exactly(["replacement"])
+
 def _reset_files_test(name):
     native.filegroup(name = name + "_files", srcs = ["rule_test.bzl"])
     _filegroup_reset(name = name + "_source", exports = "rule_test.bzl")
@@ -301,5 +335,6 @@ def rule_test_suite(name):
             _is_executable_test,
             _is_test_test,
             _reset_files_test,
+            _set_empty_list_test,
         ] + toolchain_tests,
     )

@@ -92,11 +92,13 @@ my_foo_binary, _my_foo_binary_internal = with_cfg(
 
 A builder with the following methods:
 
-* `set(setting, value)`: If `setting` is a string (e.g. `java_runtime_version`), then the
+* `set(setting, value, *, keep_if_empty = False)`: If `setting` is a string (e.g. `java_runtime_version`), then the
   corresponding native Bazel flag (e.g. `--java_runtime_version`) is set to `value`. If
   `setting` is a [`Label`](https://bazel.build/rules/lib/builtins/Label) of a [user-defined
   build setting](https://bazel.build/extending/config#user-defined-build-settings), then that
-  setting is set to `value`. `value` can be a `select` expression.
+  setting is set to `value`. `value` can be a `select` expression. For a list-valued setting,
+  pass `keep_if_empty = True` to keep its incoming value when `value` resolves to an empty
+  list. By default an empty list clears the setting.
 * `extend(setting, value)`: Like `set`, but instead of setting the setting to `value`, the
   entries of `value` are appended to the current value if it doesn't already have them as a
   suffix. `value` has to be a list or a `select` expression evaluating to a list. This is

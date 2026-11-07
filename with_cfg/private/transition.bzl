@@ -68,6 +68,16 @@ def _transition_base_impl(settings, attr, *, operations, original_settings_label
         if operation == "set":
             # Always idempotent.
             new_settings[key] = attr_value
+        elif operation == "set_unless_empty":
+            if not is_list(current_value) or not is_list(attr_value):
+                fail(
+                    "Cannot set '{}' with keep_if_empty because both values must be lists, got {} and {}.".format(
+                        setting,
+                        current_value,
+                        attr_value,
+                    ),
+                )
+            new_settings[key] = attr_value if attr_value else current_value
         elif operation == "extend":
             if not is_list(current_value) or not is_list(attr_value):
                 fail(

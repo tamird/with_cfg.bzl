@@ -5,7 +5,7 @@ load(":select.bzl", "map_attr")
 load(":setting.bzl", "validate_and_get_attr_name")
 load(":transition.bzl", "make_transition")
 load(":transitioning_alias.bzl", "make_transitioning_alias")
-load(":utils.bzl", "is_label", "is_list")
+load(":utils.bzl", "is_bool", "is_label", "is_list")
 load(":wrapper.bzl", "make_wrapper")
 
 visibility("private")
@@ -41,9 +41,10 @@ def _make_builder(rule_info, *, values = {}, operations = {}):
             mutable_has_been_built = mutable_has_been_built,
             overrides_allowed = overrides_allowed,
         ),
-        set = lambda setting, value: _set(
+        set = lambda setting, value, *, keep_if_empty = False: _set(
             setting,
             value,
+            keep_if_empty = keep_if_empty,
             self = self,
             values = values,
             operations = operations,
@@ -142,9 +143,11 @@ def _extend(setting, value, *, self, values, operations, mutable_has_been_built,
     operations[setting] = "extend"
     return self
 
-def _set(setting, value, *, self, values, operations, mutable_has_been_built, overrides_allowed):
+def _set(setting, value, *, keep_if_empty, self, values, operations, mutable_has_been_built, overrides_allowed):
     if mutable_has_been_built[0]:
         fail("set() can only be called before build()")
+    if not is_bool(keep_if_empty):
+        fail("keep_if_empty must be a bool, got " + repr(keep_if_empty))
     validate_and_get_attr_name(setting)
     if setting in values:
         if setting in overrides_allowed:
@@ -155,7 +158,7 @@ def _set(setting, value, *, self, values, operations, mutable_has_been_built, ov
     # Make a deep copy so that subsequent modification doesn't affect the builder state.
     # This improves readability but is also necessary for clone() to work correctly.
     values[setting] = map_attr(_clone_value_deeply, value)
-    operations[setting] = "set"
+    operations[setting] = "set_unless_empty" if keep_if_empty else "set"
     return self
 
 def _resettable(label, *, self, mutable_original_settings_label, mutable_has_been_built):
