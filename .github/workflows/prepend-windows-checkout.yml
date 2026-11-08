@@ -1,0 +1,30 @@
+name: Check the prepend example's Windows checkout
+on:
+  push:
+    branches: [qualification/prepend-windows-checkout]
+permissions: {}
+jobs:
+  windows:
+    if: github.repository == 'tamird/with_cfg.bzl' && github.actor == github.repository_owner && github.event.created && !github.event.deleted && github.run_attempt == 1
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check the two original Bazel tests on both sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git fetch --no-tags --depth=3 https://github.com/tamird/with_cfg.bzl.git "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = 9d908c42835e0c00cfb195ff9cede3b4b6d3e2c2
+          test "$(git rev-parse HEAD^^)" = 14a10e44f636caafa6a2c589b7da9d4a02e5e31c
+          cp .github/qualification/prepend_windows.py "$RUNNER_TEMP/prepend_windows.py"
+          python -IB "$RUNNER_TEMP/prepend_windows.py"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: prepend-windows-checkout
+          path: ${{ runner.temp }}/prepend-windows/result.json
+          if-no-files-found: error
+          retention-days: 14
